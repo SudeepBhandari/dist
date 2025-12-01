@@ -86,9 +86,13 @@ if (navbarToggleBtn && navbarMenu) {
 }
 
 // Fetch and Display Projects
+// Fetch and Display Projects
 async function loadProjects() {
     try {
         const response = await fetch('projects.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const projects = await response.json();
         const projectsGrid = document.getElementById('projects-grid');
 
@@ -99,12 +103,30 @@ async function loadProjects() {
                     ? `<video src="${project.image_url}" class="w-full h-48 object-cover transform group-hover:scale-110 transition-transform duration-500" muted loop playsinline onmouseover="this.play()" onmouseout="this.pause()"></video>`
                     : `<img src="${project.image_url || 'https://via.placeholder.com/400x300'}" alt="${project.title}" class="w-full h-48 object-cover transform group-hover:scale-110 transition-transform duration-500">`;
 
+                let tagsHtml = '';
+                try {
+                    let tags = project.tags;
+                    if (typeof tags === 'string') {
+                        tags = JSON.parse(tags);
+                    }
+                    if (Array.isArray(tags)) {
+                        tagsHtml = tags.map(tag => `
+                            <span class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-sm rounded-full text-gray-600 dark:text-gray-300">${tag}</span>
+                        `).join('');
+                    }
+                } catch (e) {
+                    console.warn('Error parsing tags for project:', project.title, e);
+                }
+
+                // Safe project object for onclick
+                const safeProject = JSON.stringify(project).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+
                 return `
                 <div class="card group cursor-pointer" data-aos="fade-up">
                     <div class="relative overflow-hidden rounded-lg mb-4">
                         ${mediaElement}
                         <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <button onclick='openModal(${JSON.stringify(project).replace(/'/g, "&#39;")})' class="bg-white text-gray-900 px-6 py-2 rounded-full font-semibold hover:bg-blue-600 hover:text-white transition-colors duration-300 transform translate-y-4 group-hover:translate-y-0">
+                            <button onclick='openModal(${safeProject})' class="bg-white text-gray-900 px-6 py-2 rounded-full font-semibold hover:bg-blue-600 hover:text-white transition-colors duration-300 transform translate-y-4 group-hover:translate-y-0">
                                 View Project
                             </button>
                         </div>
@@ -112,15 +134,17 @@ async function loadProjects() {
                     <h3 class="text-xl font-bold mb-2 dark:text-white group-hover:text-blue-600 transition-colors">${project.title}</h3>
                     <p class="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">${project.description}</p>
                     <div class="flex flex-wrap gap-2">
-                        ${JSON.parse(project.tags || '[]').map(tag => `
-                            <span class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-sm rounded-full text-gray-600 dark:text-gray-300">${tag}</span>
-                        `).join('')}
+                        ${tagsHtml}
                     </div>
                 </div>
             `}).join('');
         }
     } catch (error) {
         console.error('Error loading projects:', error);
+        const projectsGrid = document.getElementById('projects-grid');
+        if (projectsGrid) {
+            projectsGrid.innerHTML = `<div class="col-span-3 text-center text-red-500">Failed to load projects: ${error.message}</div>`;
+        }
     }
 }
 
@@ -163,9 +187,22 @@ function openModal(project) {
         description.textContent = project.description;
 
         // Clear and add tags
-        tagsContainer.innerHTML = JSON.parse(project.tags || '[]').map(tag => `
-            <span class="px-3 py-1 bg-gray-200 dark:bg-gray-600 text-sm rounded-full text-gray-700 dark:text-gray-200">${tag}</span>
-        `).join('');
+        // Clear and add tags
+        let tagsHtml = '';
+        try {
+            let tags = project.tags;
+            if (typeof tags === 'string') {
+                tags = JSON.parse(tags);
+            }
+            if (Array.isArray(tags)) {
+                tagsHtml = tags.map(tag => `
+                    <span class="px-3 py-1 bg-gray-200 dark:bg-gray-600 text-sm rounded-full text-gray-700 dark:text-gray-200">${tag}</span>
+                `).join('');
+            }
+        } catch (e) {
+            console.warn('Error parsing tags for modal:', e);
+        }
+        tagsContainer.innerHTML = tagsHtml;
 
         // Handle External Link
         if (project.external_link) {
