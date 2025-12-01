@@ -89,11 +89,18 @@ if (navbarToggleBtn && navbarMenu) {
 // Fetch and Display Projects
 async function loadProjects() {
     try {
-        const response = await fetch('projects.json');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        let projects = [];
+        const localProjects = localStorage.getItem('localProjects');
+
+        if (localProjects) {
+            projects = JSON.parse(localProjects);
+        } else {
+            const response = await fetch('projects.json');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            projects = await response.json();
         }
-        const projects = await response.json();
         const projectsGrid = document.getElementById('projects-grid');
 
         if (projectsGrid) {
