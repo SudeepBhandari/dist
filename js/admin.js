@@ -7,6 +7,7 @@ const projectForm = document.getElementById('project-form');
 const addProjectBtn = document.getElementById('add-project-btn');
 const closeModalBtn = document.getElementById('close-modal');
 const adminProjectsList = document.getElementById('admin-projects-list');
+const exportBtn = document.getElementById('export-btn');
 
 // Check Auth on Load
 const token = localStorage.getItem('adminToken');
@@ -48,12 +49,29 @@ logoutBtn.addEventListener('click', () => {
     showLogin();
 });
 
-// Load Projects (DEMO MODE: Load from JSON)
+// Helper: Get Projects from LocalStorage or Initialize
+async function getProjects() {
+    let localProjects = localStorage.getItem('localProjects');
+
+    if (!localProjects) {
+        try {
+            const response = await fetch('/projects.json');
+            const projects = await response.json();
+            localStorage.setItem('localProjects', JSON.stringify(projects));
+            return projects;
+        } catch (error) {
+            console.error('Error fetching initial projects:', error);
+            return [];
+        }
+    }
+
+    return JSON.parse(localProjects);
+}
+
+// Load Projects (LOCAL STORAGE MODE)
 async function loadAdminProjects() {
     try {
-        // Fetch from static JSON file instead of API
-        const response = await fetch('/projects.json');
-        const projects = await response.json();
+        const projects = await getProjects();
 
         adminProjectsList.innerHTML = projects.map(project => {
             const isVideo = project.image_url && (project.image_url.endsWith('.mp4') || project.image_url.endsWith('.webm') || project.image_url.endsWith('.ogg'));
@@ -81,7 +99,7 @@ async function loadAdminProjects() {
         `}).join('');
     } catch (error) {
         console.error('Error loading projects:', error);
-        adminProjectsList.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-red-500">Error loading projects. Make sure projects.json exists.</td></tr>';
+        adminProjectsList.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-red-500">Error loading projects.</td></tr>';
     }
 }
 
@@ -96,14 +114,63 @@ closeModalBtn.addEventListener('click', () => {
     projectModal.classList.add('hidden');
 });
 
-// Create Project (DEMO MODE)
+// Create Project (LOCAL STORAGE MODE)
 projectForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    alert('This is a static demo. Adding projects is disabled because there is no backend database.');
+
+    const formData = new FormData(projectForm);
+    const projects = await getProjects();
+
+    // Generate new ID
+    const newId = projects.length > 0 ? Math.max(...projects.map(p => p.id)) + 1 : 1;
+
+    // Create new project object
+    const newProject = {
+        id: newId,
+        title: formData.get('title'),
+        slug: formData.get('title').toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
+        description: formData.get('description'),
+        tags: JSON.stringify(formData.get('tags').split(',').map(tag => tag.trim())),
+        image_url: 'https://via.placeholder.com/800x600', // Placeholder since we can't upload files
+        gallery_urls: null,
+        created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        is_published: formData.get('is_published') ? 1 : 0,
+        external_link: null
+    };
+
+    // Note: File upload is not possible in static mode without a backend or 3rd party service.
+    // We could use FileReader to show it locally, but it won't persist across sessions well if large.
+    // For now, we use a placeholder or let user paste a URL if we added a URL field.
+
+    projects.unshift(newProject);
+    localStorage.setItem('localProjects', JSON.stringify(projects));
+
     projectModal.classList.add('hidden');
+    loadAdminProjects();
+    alert('Project saved locally! Remember to Export Data to make it permanent.');
 });
 
-// Delete Project (DEMO MODE)
+// Delete Project (LOCAL STORAGE MODE)
 window.deleteProject = async (id) => {
-    alert('This is a static demo. Deleting projects is disabled because there is no backend database.');
+    if (!confirm('Are you sure you want to delete this project?')) return;
+
+    let projects = await getProjects();
+    projects = projects.filter(p => p.id !== id);
+    localStorage.setItem('localProjects', JSON.stringify(projects));
+
+    loadAdminProjects();
 };
+
+// Export Data
+if (exportBtn) {
+    exportBtn.addEventListener('click', async () => {
+        const projects = await getProjects();
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projects, null, 4));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "projects.json");
+        document.body.appendChild(downloadAnchorNode); // required for firefox
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    });
+}
