@@ -87,6 +87,113 @@ async function loadAdminProjects() {
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">${project.title}</div>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${project.is_published ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                        ${project.is_published ? 'Published' : 'Draft'}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="editProject(${project.id})" class="text-blue-600 hover:text-blue-900 mr-4">Edit</button>
+                    <button onclick="deleteProject(${project.id})" class="text-red-600 hover:text-red-900">Delete</button>
+                </td>
+            </tr>
+        `}).join('');
+    } catch (error) {
+        console.error('Error loading projects:', error);
+        adminProjectsList.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-red-500">Error loading projects.</td></tr>';
+    }
+}
+
+// Add Project Modal
+addProjectBtn.addEventListener('click', () => {
+    projectForm.reset();
+    document.getElementById('project-id').value = ''; // Clear ID for new project
+    document.getElementById('modal-title').innerText = 'Add New Project';
+    projectModal.classList.remove('hidden');
+});
+
+closeModalBtn.addEventListener('click', () => {
+    projectModal.classList.add('hidden');
+});
+
+// Edit Project (LOCAL STORAGE MODE)
+window.editProject = async (id) => {
+    const projects = await getProjects();
+    const project = projects.find(p => p.id === id);
+
+    if (project) {
+        document.getElementById('project-id').value = project.id;
+        document.getElementById('project-title').value = project.title;
+        document.getElementById('project-description').value = project.description;
+
+        // Handle tags parsing
+        let tags = project.tags;
+        try {
+            if (typeof tags === 'string') tags = JSON.parse(tags);
+            if (Array.isArray(tags)) document.getElementById('project-tags').value = tags.join(', ');
+        } catch (e) {
+            document.getElementById('project-tags').value = project.tags || '';
+        }
+
+        document.getElementById('project-published').checked = project.is_published == 1;
+
+        document.getElementById('modal-title').innerText = 'Edit Project';
+        projectModal.classList.remove('hidden');
+    }
+};
+
+// Create/Update Project (LOCAL STORAGE MODE)
+projectForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(projectForm);
+    let projects = await getProjects();
+    const id = document.getElementById('project-id').value;
+
+    if (id) {
+        // UPDATE existing project
+        const index = projects.findIndex(p => p.id == id);
+        if (index !== -1) {
+            projects[index] = {
+                ...projects[index],
+                title: formData.get('title'),
+                slug: formData.get('title').toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
+                description: formData.get('description'),
+                tags: JSON.stringify(formData.get('tags').split(',').map(tag => tag.trim())),
+                is_published: formData.get('is_published') ? 1 : 0,
+                // Keep existing image if not changed (simulated)
+                image_url: projects[index].image_url
+            };
+        }
+    } else {
+        // CREATE new project
+        const newId = projects.length > 0 ? Math.max(...projects.map(p => p.id)) + 1 : 1;
+        const newProject = {
+            id: newId,
+            title: formData.get('title'),
+            slug: formData.get('title').toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
+            description: formData.get('description'),
+            tags: JSON.stringify(formData.get('tags').split(',').map(tag => tag.trim())),
+            image_url: 'https://via.placeholder.com/800x600',
+            gallery_urls: null,
+            created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            is_published: formData.get('is_published') ? 1 : 0,
+            external_link: null
+        };
+        projects.unshift(newProject);
+    }
+
+    localStorage.setItem('localProjects', JSON.stringify(projects));
+
+    projectModal.classList.add('hidden');
+    loadAdminProjects();
+    alert(id ? 'Project updated locally!' : 'Project saved locally! Remember to Export Data to make it permanent.');
+});
+
+// Delete Project (LOCAL STORAGE MODE)
+window.deleteProject = async (id) => {
+    if (!confirm('Are you sure you want to delete this project?')) return;
+
     let projects = await getProjects();
     projects = projects.filter(p => p.id !== id);
     localStorage.setItem('localProjects', JSON.stringify(projects));
