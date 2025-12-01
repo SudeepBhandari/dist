@@ -27,28 +27,18 @@ function showDashboard() {
     loadAdminProjects();
 }
 
-// Login Logic
+// Login Logic (DEMO MODE)
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-            localStorage.setItem('adminToken', data.token);
-            showDashboard();
-        } else {
-            alert(data.error);
-        }
-    } catch (error) {
-        console.error('Login error:', error);
+    // Simple client-side check for demo purposes
+    if (username === 'admin' && password === 'admin') {
+        localStorage.setItem('adminToken', 'demo-token');
+        showDashboard();
+    } else {
+        alert('Invalid credentials! Try admin/admin');
     }
 });
 
@@ -58,12 +48,11 @@ logoutBtn.addEventListener('click', () => {
     showLogin();
 });
 
-// Load Projects
+// Load Projects (DEMO MODE: Load from JSON)
 async function loadAdminProjects() {
     try {
-        const response = await fetch('/api/projects/admin', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
-        });
+        // Fetch from static JSON file instead of API
+        const response = await fetch('/projects.json');
         const projects = await response.json();
 
         adminProjectsList.innerHTML = projects.map(project => {
@@ -92,6 +81,7 @@ async function loadAdminProjects() {
         `}).join('');
     } catch (error) {
         console.error('Error loading projects:', error);
+        adminProjectsList.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-red-500">Error loading projects. Make sure projects.json exists.</td></tr>';
     }
 }
 
@@ -106,55 +96,14 @@ closeModalBtn.addEventListener('click', () => {
     projectModal.classList.add('hidden');
 });
 
-// Create Project
+// Create Project (DEMO MODE)
 projectForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const formData = new FormData(projectForm);
-    // Handle checkbox manually if needed, but FormData usually handles it.
-    // If unchecked, it might not be in formData, so we might need to append it or handle in backend.
-    // Backend expects 'is_published' in body.
-
-    // Note: FormData handles file uploads automatically.
-
-    try {
-        const response = await fetch('/api/projects', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-            },
-            body: formData // Don't set Content-Type header for FormData, browser does it with boundary
-        });
-
-        if (response.ok) {
-            projectModal.classList.add('hidden');
-            loadAdminProjects();
-        } else {
-            const data = await response.json();
-            alert(data.error || 'Failed to save project');
-        }
-    } catch (error) {
-        console.error('Error saving project:', error);
-    }
+    alert('This is a static demo. Adding projects is disabled because there is no backend database.');
+    projectModal.classList.add('hidden');
 });
 
-// Delete Project
+// Delete Project (DEMO MODE)
 window.deleteProject = async (id) => {
-    if (!confirm('Are you sure you want to delete this project?')) return;
-
-    try {
-        const response = await fetch(`/api/projects/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-            }
-        });
-
-        if (response.ok) {
-            loadAdminProjects();
-        } else {
-            alert('Failed to delete project');
-        }
-    } catch (error) {
-        console.error('Error deleting project:', error);
-    }
+    alert('This is a static demo. Deleting projects is disabled because there is no backend database.');
 };
