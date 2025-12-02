@@ -86,11 +86,10 @@ if (navbarToggleBtn && navbarMenu) {
 }
 
 // Fetch and Display Projects
-// Fetch and Display Projects
 async function loadProjects() {
     try {
         let projects = [];
-        const localProjects = localStorage.getItem('localProjects');
+        const localProjects = localStorage.getItem('localProjects_v3');
 
         if (localProjects) {
             projects = JSON.parse(localProjects);
@@ -100,12 +99,20 @@ async function loadProjects() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             projects = await response.json();
+            // Cache it immediately
+            localStorage.setItem('localProjects_v3', JSON.stringify(projects));
         }
+
         const projectsGrid = document.getElementById('projects-grid');
 
         if (projectsGrid) {
             projectsGrid.innerHTML = projects.map(project => {
-                const isVideo = project.image_url && (project.image_url.endsWith('.mp4') || project.image_url.endsWith('.webm') || project.image_url.endsWith('.ogg'));
+                const isVideo = project.image_url && (
+                    project.image_url.endsWith('.mp4') ||
+                    project.image_url.endsWith('.webm') ||
+                    project.image_url.endsWith('.ogg') ||
+                    project.image_url.startsWith('data:video/')
+                );
                 const mediaElement = isVideo
                     ? `<video src="${project.image_url}" class="w-full h-48 object-cover transform group-hover:scale-110 transition-transform duration-500" muted loop playsinline onmouseover="this.play()" onmouseout="this.pause()"></video>`
                     : `<img src="${project.image_url || 'https://via.placeholder.com/400x300'}" alt="${project.title}" class="w-full h-48 object-cover transform group-hover:scale-110 transition-transform duration-500">`;
@@ -169,7 +176,12 @@ function openModal(project) {
         title.textContent = project.title;
 
         // Handle Image or Video in Modal
-        const isVideo = project.image_url && (project.image_url.endsWith('.mp4') || project.image_url.endsWith('.webm') || project.image_url.endsWith('.ogg'));
+        const isVideo = project.image_url && (
+            project.image_url.endsWith('.mp4') ||
+            project.image_url.endsWith('.webm') ||
+            project.image_url.endsWith('.ogg') ||
+            project.image_url.startsWith('data:video/')
+        );
 
         // Clear previous content
         const mediaContainer = image.parentNode;

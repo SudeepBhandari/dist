@@ -51,13 +51,13 @@ logoutBtn.addEventListener('click', () => {
 
 // Helper: Get Projects from LocalStorage or Initialize
 async function getProjects() {
-    let localProjects = localStorage.getItem('localProjects');
+    let localProjects = localStorage.getItem('localProjects_v3');
 
     if (!localProjects) {
         try {
             const response = await fetch('/projects.json');
             const projects = await response.json();
-            localStorage.setItem('localProjects', JSON.stringify(projects));
+            localStorage.setItem('localProjects_v3', JSON.stringify(projects));
             return projects;
         } catch (error) {
             console.error('Error fetching initial projects:', error);
@@ -74,7 +74,12 @@ async function loadAdminProjects() {
         const projects = await getProjects();
 
         adminProjectsList.innerHTML = projects.map(project => {
-            const isVideo = project.image_url && (project.image_url.endsWith('.mp4') || project.image_url.endsWith('.webm') || project.image_url.endsWith('.ogg'));
+            const isVideo = project.image_url && (
+                project.image_url.endsWith('.mp4') ||
+                project.image_url.endsWith('.webm') ||
+                project.image_url.endsWith('.ogg') ||
+                project.image_url.startsWith('data:video/')
+            );
             const mediaPreview = isVideo
                 ? `<video src="${project.image_url}" class="h-10 w-10 rounded-full object-cover"></video>`
                 : `<img src="${project.image_url || 'https://via.placeholder.com/50'}" class="h-10 w-10 rounded-full object-cover">`;
@@ -149,11 +154,39 @@ projectForm.addEventListener('submit', async (e) => {
     const formData = new FormData(projectForm);
     let projects = await getProjects();
     const id = document.getElementById('project-id').value;
+    const imageInput = document.getElementById('project-image');
+    let imageUrl = 'https://via.placeholder.com/800x600'; // Default
+
+    // Helper to read file as Base64
+    const readFile = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    // Handle Image Upload
+    if (imageInput.files && imageInput.files[0]) {
+        try {
+            imageUrl = await readFile(imageInput.files[0]);
+        } catch (error) {
+            console.error('Error reading file:', error);
+            alert('Error uploading image. Please try again.');
+            return;
+        }
+    }
 
     if (id) {
         // UPDATE existing project
         const index = projects.findIndex(p => p.id == id);
         if (index !== -1) {
+            // If no new image uploaded, keep existing
+            if (!imageInput.files || !imageInput.files[0]) {
+                imageUrl = projects[index].image_url;
+            }
+
             projects[index] = {
                 ...projects[index],
                 title: formData.get('title'),
@@ -161,8 +194,7 @@ projectForm.addEventListener('submit', async (e) => {
                 description: formData.get('description'),
                 tags: JSON.stringify(formData.get('tags').split(',').map(tag => tag.trim())),
                 is_published: formData.get('is_published') ? 1 : 0,
-                // Keep existing image if not changed (simulated)
-                image_url: projects[index].image_url
+                image_url: imageUrl
             };
         }
     } else {
@@ -174,7 +206,7 @@ projectForm.addEventListener('submit', async (e) => {
             slug: formData.get('title').toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
             description: formData.get('description'),
             tags: JSON.stringify(formData.get('tags').split(',').map(tag => tag.trim())),
-            image_url: 'https://via.placeholder.com/800x600',
+            image_url: imageUrl,
             gallery_urls: null,
             created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
             is_published: formData.get('is_published') ? 1 : 0,
@@ -183,11 +215,20 @@ projectForm.addEventListener('submit', async (e) => {
         projects.unshift(newProject);
     }
 
-    localStorage.setItem('localProjects', JSON.stringify(projects));
-
-    projectModal.classList.add('hidden');
-    loadAdminProjects();
-    alert(id ? 'Project updated locally!' : 'Project saved locally! Remember to Export Data to make it permanent.');
+    try {
+        localStorage.setItem('localProjects_v3', JSON.stringify(projects));
+        projectModal.classList.add('hidden');
+        loadAdminProjects();
+        alert(id ? 'Project updated locally!' : 'Project saved locally! Remember to Export Data to make it permanent.');
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            alert('Storage limit exceeded! The image file is likely too large. Please try a smaller image (under 3MB recommended).');
+            // Revert changes in memory if needed, but for now just warn
+        } else {
+            console.error('Error saving to localStorage:', e);
+            alert('An error occurred while saving. Please try again.');
+        }
+    }
 });
 
 // Delete Project (LOCAL STORAGE MODE)
@@ -196,7 +237,7 @@ window.deleteProject = async (id) => {
 
     let projects = await getProjects();
     projects = projects.filter(p => p.id !== id);
-    localStorage.setItem('localProjects', JSON.stringify(projects));
+    localStorage.setItem('localProjects_v3', JSON.stringify(projects));
 
     loadAdminProjects();
 };
