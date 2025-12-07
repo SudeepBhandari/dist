@@ -11,4 +11,4 @@ git commit -m "Auto-update website"
 git push
 
 echo Deployment complete!
-pause
+
