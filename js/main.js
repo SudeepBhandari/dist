@@ -89,18 +89,27 @@ if (navbarToggleBtn && navbarMenu) {
 async function loadProjects() {
     try {
         let projects = [];
-        const localProjects = localStorage.getItem('localProjects_v3');
 
-        if (localProjects) {
-            projects = JSON.parse(localProjects);
-        } else {
-            const response = await fetch('projects.json');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            projects = await response.json();
-            // Cache it immediately
+        // Check if PROJECTS_DATA is defined (from projects-data.js)
+        if (typeof PROJECTS_DATA !== 'undefined') {
+            projects = PROJECTS_DATA;
+            // Cache it
             localStorage.setItem('localProjects_v3', JSON.stringify(projects));
+        } else {
+            // Fallback to localStorage or fetch
+            const localProjects = localStorage.getItem('localProjects_v3');
+
+            if (localProjects) {
+                projects = JSON.parse(localProjects);
+            } else {
+                const response = await fetch('projects.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                projects = await response.json();
+                // Cache it immediately
+                localStorage.setItem('localProjects_v3', JSON.stringify(projects));
+            }
         }
 
         const projectsGrid = document.getElementById('projects-grid');
